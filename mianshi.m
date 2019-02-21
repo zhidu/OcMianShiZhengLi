@@ -123,12 +123,108 @@ UIView和CALayer关系：
           添加类方法
           添加协议
           添加属性（没有实例变量）
+      总结：分类添加的方法可以“覆盖”原类的方法
+           同名分类方法谁能生效取决于编译顺序（最后被编译的分类，会被优先被生效）
+           名字相同的分类会引起编译报错
+      注意： category的方法没有“完全替换掉”原来类已经有的方法，也就是说如果category和原来类都有methodA，那么category附加完成之后，类的方法列表里会有两个methodA
+            category的方法被放到了新方法列表的前面，而原来类的方法被放到了新方法列表的后面，这也就是我们平常所说的category的方法会“覆盖”掉原来类的同名方法，这是因为运行时在查找方法的时候是顺着方法列表的顺序查找的，它只要一找到对应名字的方法，就会罢休，殊不知后面可能还有一样名字的方法。
+      问题： 在类的+load方法调用的时候，我们可以调用category中声明的方法么？
+            这么些个+load方法，调用顺序是咋样的呢？
+            1)、可以调用
+            2)、+load的执行顺序是先类，后category，而category的+load执行顺序是根据编译顺序决定的。 目前的编译顺序是这样的：后编译的执行
+
 2.关联对象
+  关联对象的本质：
+      关联对象由AssociationsManager管理并在AssociationsMapHash中储存。所有对象的关联内容都在统一的全局容器中
+              AssociationsHashMap -> key : (obj分类对象)
+                                    value:ObjectAssociationMap
+              ObjectAssociationMap -> key:@selector(text)
+                                    value:ObjectAssociation
+              ObjectAssociation(对象) -> OBJC_ASSOCIATION_COPY_NONATOMIC（策略） 、@“hello”（值）
+              例子：
+                    {
+                    "Ox49333333" : {
+                        "@selector(text)":{
+                            "value"  : "hello"
+                            "policy" :  "copy"
+                        },
+                        "@selector(color)":{
+                            "value"  : "[uicolor whitecolor]"
+                            "policy" :  "retain"
+                        }
+                    },
+                    "Ox49444444" : {
+                        "@selector(---)":{
+                            "value"  : "---"
+                            "policy" :  "---"
+                        }
+                    },
+                    }
 3.扩展
+   做什么：
+          申明私有属性
+          申明私有方法
+          申明成员变量
+   特点：
+          编译时决议
+          只以声明的形式存在，多数情况下寄生在宿主类的.m中
+          不能为系统类添加扩展
+
 4.代理
+   什么是代理：
+     准确的说是一种软件设计模式
+     ios中以@protocol形式体现
+     一对一
+   代理工作流程：
+     协议  委托方（定义类） 代理方（遵循类）
+     在协议里写委托方要求代代理方需要实现的接口
+     代理方遵循协议实现方法，可能返回一个处理结果
+     委托方调用代理方遵循的协议方法
+   注意：
+    一般在委托方中以weak以规避循环引用
 5.通知
+   特点：
+     使用观察者模式来实现用于跨层传递消息（代理是用代理模式）
+     传递方式一对多
+  如何实现通知机制：
+     Notification_Map -> key :notificationName
+                        value:Observers_list(NSMutableArray< Observer>)
+     Observer -> observer(观察者对象)、selector（执行的方法）、notificationName（通知名字）、object（携带参数）
+     addObserver时新增observer将其存入Notification_Map的数据结构中
+     removeObserver时将observer移除
+     post在数据结构中寻找对应的观察者执行方法
 6.kvo
+   KVO是Key-value observing的缩写
+   KVO是OC对观察者设计模式的一种实现
+   苹果使用isa混写技术（isa-swizzling）来实现kvo（把isa的指针指向修改就是混写技术，当我们使用addobser时，系统会在运行时动态创建一个类NSKVONotifying_A,并将A的isa指针指向NSKVONotifying_A，NSKVONotifying_A是A的子类，之所以有这个继承关系是为了重写setter方法，在setter方法里通知所有通知者）
+   //手动触发kvo
+   [self willChangeValueForKey:@"XXX"];
+   [super setXXX];
+   [self didChangeValueForKey:@"XXX”];
+  通过设置kvc设置属性能否使kvo生效?
+  能，最终会调用set方法，系统已经重写了set方法
+  通过成员变量赋值属性能否使kvo生效?
+  不会，没有调用set方法
+  总结：
+    使用setter方法改变值，KVO才会生效
+    使用KVCg改变值，KVO才会生效
+    成员变量直接修改需要手动添加KVO才会生效
 7.kvc
+    KVC是Key-value coding缩写
+    方法：valueforKey和setvalueforekey
+    注意：
+    面向对象破坏了面向对象编程思想（已知私有属性，通过kvc去修改）
+    valueForkey流程:
+    访问器方法是否存在 - YES : 直接调用
+                    - NO :  同名或类似名称实例变量是否存在 - YES : 直接调用
+                                                      - NO : valueForUndefinekey
+    setValue流程:同valueForkey流程
+    
+    访问器是否存在规则 <getKey> <key> <isKey> ---存在
+    同名或类似名称实例变量是否存在规则 _key _isKey key iskey ----存在
+    
+    在判断同名或类似名称实例变量是否存在时，若实现accessInstanceVariablesDirectly，会直接调用valueForUndefinekey
+    
 8.属性关键字
 
 
