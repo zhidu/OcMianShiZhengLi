@@ -224,8 +224,59 @@ UIView和CALayer关系：
     同名或类似名称实例变量是否存在规则 _key _isKey key iskey ----存在
     
     在判断同名或类似名称实例变量是否存在时，若实现accessInstanceVariablesDirectly，会直接调用valueForUndefinekey
-    
+    用
+    应用：
+      动态地取值和设值
+      用KVC来访问和修改私有变量
+      Model和字典转换
+      用KVC实现高阶消息传递,比如当对容器类使用KVC时，valueForKey:将会被传递给容器中的每一个对象，而不是容器本身进行操作。结果会被添加进返回的容器中，这样，开发者可以很方便的操作集合来返回另一个集合
+      用KVC中的函数操作集合
 8.属性关键字
 
-
+四、内存管理
+    内存布局
+    顺序从stack到text，由高到低
+            stack:方法调用
+             heap:通过alloc等分配的对象
+              bss:未初始化的全局变量等
+             data:已经初始化的全局变量等
+             text:程序代码
+    内存管理方案
+    小对象 ：TaggedPointer(NSNumber)
+    64位架构：NONPointer_isa:
+         64位架构下NONPointer_isa占64个比特位，实际上32或者40位就够了，剩余位数是浪费的，苹果为了提高内存利用率，苹果在剩余的比特位中存储了内存管理相关的数据内容，这个叫非指针型的isa
+         arm64架构：
+           第0二进制位:indexed(0 - 使用的isa指针只是代表当前对象地址  1- 表示isa不仅存储还存储内存管理相关数据内容)
+           第1二进制位：has_assoc是否关联对象(0 - 没有  1 - 有)
+           第2二进制位：has_cxx_dtor当前的对象是否使用了c++
+           第3-35二进制位：shiftcls当前对象类对象的指针地址
+           第36-41:magic
+           第43二进制位：weakly_referenced表示是否有弱引用指针
+           第44二进制位：deallocating当前对象是否在进行delloc操作
+           第45二进位：has_sidetable_rc当前这个isa的指针如果存储的引用计数已经达到上限，需要外挂一个sidetable数据结构存储相关内容
+           第46-63二进制位：extra_rc额外的引用计数
+    散列表（弱引用表/引用计数表）：
+         side tables()结构
+         side tables() = @[side Table,side Table...]
+         side Table 结构: 自旋锁 spinlock_t
+                         引用计数表 refcountMap
+                         弱引用表  weak_table_t
+         为什么不是一个side table ？而是由多个side table组成side tables()结构
+          只有一个side table表，意味着所有的引用计数表和弱引用表都在一张表里，多线程安全需要给side table加锁，有效率问题，系统为了解决这个问题，引入了分离锁（8个表组成一个表）
+         怎样实现快速分流？
+         side tables 的本质是一张hash表
+          对象指针（key） （通过hash函数）-> side tableside
+         数据结构：
+         spinlock_t是“忙等”的锁， 适用于轻量访问
+         refcountMap 是一个hash表，通过传入对象的指针可以获取对象的引用计数，插入和获取用的同一个hash函数，避免了遍历，提高效率   指针 ( 通过hash函数)-> size_t
+         size_t :
+              第0二进制位：weakly_referenced表示是否有弱引用指针
+              第1二进制位：deallocating当前对象是否在进行delloc操作
+              第2-63二进制位：RC引用计数
+         weak_table_t:是一个hash表
+    ARC和MRC
+    引用计数
+    弱引用
+    自动释放池
+    循环引用
 
