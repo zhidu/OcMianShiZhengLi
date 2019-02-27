@@ -232,6 +232,58 @@ UIView和CALayer关系：
       用KVC实现高阶消息传递,比如当对容器类使用KVC时，valueForKey:将会被传递给容器中的每一个对象，而不是容器本身进行操作。结果会被添加进返回的容器中，这样，开发者可以很方便的操作集合来返回另一个集合
       用KVC中的函数操作集合
 8.属性关键字
+    读写权限：
+    readonly readwrite(默认)
+    原子类：
+    atomic  赋值和获取线程安全，添加对象和移除对象等别的操作不是线程安全的
+    nonatomic
+    引用计数：
+    retain/strong
+    assign/unsafe_unretained
+    特点：
+    修饰基本数据类型
+    修饰对象类型师，不改变其引用计数
+    会产生悬垂指针
+    weak
+    特点：
+    不改变被修饰对象的引用计数
+    所指对象在释放后会自动置为nil
+    9.浅拷贝和深拷贝
+    是否开辟新的内存空间
+    是否影响了引用计数
+    
+    mutable对象（可变）        copy       不可变   深拷贝
+    mutable对象（可变）     mutablecopy    可变    深拷贝
+    immutable对象（不可变）    copy        不可变   浅拷贝
+    immutable对象（不可变）  mutablecopy   可变    深拷贝
+9.initialize和load的区别
+  load:当类被引用进项目的时候就会执行load函数(在main函数开始执行之前）,与这个类是否被用到无关,每个类的load函数只会自动调用一次.由于load函数是系统自动加载的，因此不需要调用父类的load函数，否则父类的load函数会多次执行。
+      1.当父类和子类都实现load函数时,父类的load方法执行顺序要优先于子类
+      2.当子类未实现load方法时,不会调用父类load方法
+      3.类中的load方法执行顺序要优先于类别(Category)
+      4.当有多个类别(Category)都实现了load方法,这几个load方法都会执行,但执行顺序不确定(其执行顺序与类别在Compile Sources中出现的顺序一致)
+      5.当然当有多个不同的类的时候,每个类load 执行顺序与其在Compile Sources出现的顺序一致
+  initialize:
+      文档：Initializes the class before it receives its first message.当类收到第一个消息时调用，通过阻塞线程的方式执行，线程安全，不要在改方法中添加可能需要的锁的代码或者复杂的代码，以免死锁
+      1.父类优于子类调用
+      2.子类未实现initialize时可能导致父类多次调用，官方推荐写法
+      + (void)initialize {
+         if (self == [ClassName self]) {
+             // ... do the initialization ...
+         }
+      }
+                             
+    
+    总结：
+    MRC如何重写retain修饰变量的setter方法
+    - (void)setObj:(id)Obj {
+        if(_obj != obj)
+            [obj release];
+        _obj =  [obj retain];
+    }
+    请简述分类的实现原理
+    KVO的实现原理
+    能否为分类添加成员变量
 
 四、内存管理
     内存布局
@@ -248,7 +300,7 @@ UIView和CALayer关系：
          arm64架构：
            第0二进制位:indexed(0 - 使用的isa指针只是代表当前对象地址  1- 表示isa不仅存储还存储内存管理相关数据内容)
            第1二进制位：has_assoc是否关联对象(0 - 没有  1 - 有)
-           第2二进制位：has_cxx_dtor当前的对象是否使用了c++
+           第2二进制位：has_cxx_dtor当前的对象是否使用了c++和arc
            第3-35二进制位：shiftcls当前对象类对象的指针地址
            第36-41:magic
            第43二进制位：weakly_referenced表示是否有弱引用指针
@@ -274,9 +326,45 @@ UIView和CALayer关系：
               第1二进制位：deallocating当前对象是否在进行delloc操作
               第2-63二进制位：RC引用计数
          weak_table_t:是一个hash表
+         weak底层实现：
+         weak是Runtime维护了一个hash(哈希)表，用于存储指向某个对象的所有weak指针。weak表其实是一个hash（哈希）表，Key是所指对象的地址，Value是weak指针的地址（这个地址的值是所指对象指针的地址）数组。
     ARC和MRC
-    引用计数
+         MRC (手动引用计数):alloc retain release retainCount autorelease delloc
+         ARC（自动引用计数 :arc是LLVM和Runtime协作的结果
+                         禁止调用mrc手动调用 retain release retainCount autorelease delloc
+                         arc新增weak、strong属性关键字
+    引用计数管理
+    alloc:经过一系列的调用，最终调用了C函数的calloc，此时并没有设置引用计数为1（通过retaincount获取是1）
+    retain：
+        sideTable& table = SideTable()[this]
+        size_t & refcntStorage = table.refcnts[this]
+        refcntStorage += SIDE_TABLE_RC_ONE
+    release
+        sideTable& table = SideTable[()[this]
+        RefcountMap::iterator it & refcntStorage = table.refcnts.find(this)
+        it - >second -= SIDE_TABLE_RC_ONE
+    retainCount
+        sideTable& table = SideTable()[this]
+        size_t refcnt_result = 1
+        RefcountMap::iterator it & refcntStorage = table.refcnts.find(this)
+        refcnt_result += it -> second >> SIDE_TABLE_RC_SHIFT
+        刚刚alloc的对象在引用计数表中的没有这个对象keyvalue的映射，所以引用计数表查出的值为0，加上局部变量 refcnt_result，就成了1
+    delloc
+        _objc_rootDealloc() -> rootDelloc - > 判断是否可以释放 -> yes - > c函数free()
+                                                               no  - > objec_dispose()
+        判断条件NONPointer_isa、weakly_referenced、has_assoc、has_cxx_dtor、has_sidetable_rc均为NO的情况下，判断条件的值为yes
+        objec_dispose()函数实现：objc_destructInstance() - >c函数free()
+        objc_destructInstance()函数实现： hasCxxDtor ->yes ->_object_cxxDestruct
+                                                     no  ->hasAssociatedObjects -> yes ->_objc_remove_assocations() -> clearDeallocating()
+                                                                                   no  ->clearDeallocating()
+        clearDeallocating()函数实现：sidetable_clearDeallocating() -> weak_clear_no_lock()(将指向该对象的弱引用指针置为nil)->table.refcnts.erase()(从引用计数表中擦除该对象引用计数)
     弱引用
+         创建：id __weak obj1 = obj ->(编译后){
+             id obj1;
+             objc_initWeak(&objt1,obj);
+         }
+         调用栈：objc_initWeak()->storeWeak()->weak_register_no_lock()
+        一个声明为__weak的对象指针经过编译器编译后，会调用 objc_initWeak方法，经过一系列的函数调用栈，最终会在weak_register_no_lock函数中进行弱引用变量的添加，添加的位置是通过哈希算法进行位置查找，如果查找位置已经有当前对象所对应弱引用数组，会把新的弱引用变量添加到数组中，如果没有，重新创建弱引用数组，将新的弱引用变量添加到数组的第0个位置
     自动释放池
     循环引用
 
