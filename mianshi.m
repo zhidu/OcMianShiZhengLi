@@ -272,7 +272,19 @@ UIView和CALayer关系：
              // ... do the initialization ...
          }
       }
-                             
+ 10.NSDictionary底层实现原理
+    NSDictionary（字典）是使用 hash表来实现key和value之间的映射和存储的， hash函数设计的好坏影响着数据的查找访问效率。
+    NSMutableDictionary的KVC实现：
+     - (void)setValue:(id)value forKey:(NSString*)key {
+         if(value)
+             [self setObject:value forKey:key];
+         else
+             [self removeObjectForKey:key];
+     }
+     setObject: ForKey:是NSMutableDictionary特有的；setValue: ForKey:是KVC的主要方法。
+     (1) setValue: ForKey:的value是可以为nil的（但是当value为nil的时候，会自动调用removeObject：forKey方法）；
+     setObject: ForKey:的value则不可以为nil。
+     (2) setValue: ForKey:的key必须是不为nil的字符串类型；
     
     总结：
     MRC如何重写retain修饰变量的setter方法
@@ -364,7 +376,121 @@ UIView和CALayer关系：
              objc_initWeak(&objt1,obj);
          }
          调用栈：objc_initWeak()->storeWeak()->weak_register_no_lock()
+         创建过程：
         一个声明为__weak的对象指针经过编译器编译后，会调用 objc_initWeak方法，经过一系列的函数调用栈，最终会在weak_register_no_lock函数中进行弱引用变量的添加，添加的位置是通过哈希算法进行位置查找，如果查找位置已经有当前对象所对应弱引用数组，会把新的弱引用变量添加到数组中，如果没有，重新创建弱引用数组，将新的弱引用变量添加到数组的第0个位置
+         销毁过程：（清楚weak变量，同时设置指向为nil）
+         当一个对象被delloc后，delloc的内部实现中，会去调用弱引用清除的相关函数，在函数内部实现中，会根据当前对象指针查找弱引用表，把当前对象相对的弱引用拿出来，是一个数组，遍历数组所有的弱引用指针分别置为nil
     自动释放池
+        编译器会将@autoreleasePool{}改写为：
+         void *ctx = objc_autoreleasePoolPush() ->autoreleasePoolPage::push()
+         {}中的代码->所有的对象会被加到释放池中，所以说一次pop相当于一次批量的pop操作，会给每一个对象发送release消息
+         objc_autoreleasePoolPop(ctx) ->autoreleasePoolPage::pop(ctx)
+         autoreleasePoolPage {
+             id*next
+             autoreleasePoolPage*const parent
+             autoreleasePoolPage*const child
+             pthread_t const thread
+         }
+         push：增加哨兵对象，next指针指向下一个空白区域
+         pop: 从哨兵对象开始，给后面的对象发release消息
+         [obj autorelease]:判断 next == 栈顶 -> yes -> 增加一个栈结点到链表上 --> add(obj)
+                                              no   -> add(obj)
+        数据结构：
+          自动释放池是以栈为节点通过双向链表的形式组合而成
+          自动释放池是和线程一一对应
+          局部变量的释放时机:
+           在每一次的runloop将要结束的时候调用autoreleasePoolPage::pop()，同时push一个新的autoreleasePoolPage
+        autoreleasePool的实现原理:
+           自动释放池是以栈为节点通过双向链表的形式组合而成的数据结构
+        autoreleasePool为何可以嵌套使用:
+           多层嵌套就是多次插入哨兵对象
+        场景：
+          在for循环中alloc图片数据等内存消耗较大的场景手动插入autoreleasePool
     循环引用
-
+        分类
+          自循环引用：
+          相互循环引用：
+          多循环引用：
+        考点
+          代理 -相互循环引用
+          block
+          NSTimer
+          大环引用
+       如何破除：
+         避免产生循环引用
+         在合适的时机解除循环引用
+       具体解决方案：
+          __weak 弱引用
+          __block：
+              在MRC下，__block修饰的对象不会增加其引用计数，避免了循环引用
+              在ARC下，__block修饰对象会被强引用，无法避免循环引用，需手动解环
+          __unsafe_unretained
+             修饰的对象不会增加其引用计数，避免了循环引用
+             可能产生悬垂指针
+       引用示例：
+          block示例看后面block
+          NSTimer:
+          在日常开发中遇到NSTimer弱引用问题，
+            方法一：通过创建中间对象，让中间对象持有两个弱引用变量，分别为对象和NSTimer,然后在nstimer的分派回调是在中间对象中完成的，在中间对象实现的回调方法中对他持有的target值的判断，如果值存在，直接把nstimer给原对象，如果对象已经被释放了，就主动调用nstimer的销毁方法
+            方法二：通过在分类中addtarget：self，此时的self是类对象而不是实例对象，对外提供block回调。之所以能解决内存泄漏的问题，关键在于把保留转移到了定时器的类对象身上，这样就避免了实例对象被保留。类对象在App杀死时才会释放,在实际开发中几乎不用关注类对象的内存管理。iOS10中，定时器的API新增了block方法，实现原理与此类似。
+                                     
+  总结：
+       什么是ARC？
+           arc是LLVM编译器和Runtime协作的结果
+       为什么weak指针指向的对象废弃后会被自动置为nil？
+           当一个对象被delloc后，delloc的内部实现中，会去调用弱引用清除的相关函数，在函数内部实现中，会根据当前对象指针查找弱引用表，把当前对象相对的弱引用拿出来，是一个数组，遍历数组所有的弱引用指针分别置为nil
+       苹果是如何实现autoreleasePool?
+           自动释放池是以栈为节点通过双向链表的形式组合而成的数据结构
+ 五、runtime
+  1.数据结构
+     id = objc_objet { 对象-->类对象
+         isa_t
+         关于isa操作相关
+         弱引用相关
+         关联对象相关
+         内存管理相关
+     }
+                                     
+     class = objc_class {(继承自objc_objet) 类对象->元类对象
+         Class superClass
+         
+         cache_t cache
+         (方法缓存，1.用于快速查找方法执行函数 2.是可增量扩展的哈希表结构3.是局部性原理的最佳应用)
+         ->@[bucket_t,bucket_t,bucket_t,bucket_t,bucket_t...]
+         bucket_t (@selector(xxx):IMP)
+         
+         class_data_bits_t bits(变量、属性、方法)
+         class_data_bits_t主要是对class_rw_t的封装
+         class_rw_t代表类相关的读写信息、对class_ro_t的封装
+         class_ro_t代表类相关的只读信息
+         class_rw_t:class_ro_t
+                    protocols
+                    properties
+                    methods
+         protocols、properties、methods是list_array_tt(二维数组)
+         class_ro_t： name
+                     ivars
+                     protocols
+                     properties
+                     methodList
+         ivars、protocols、properties、methodList是一维数组
+     }
+     isa指针 分为指针型（isa的值代表class的地址）和非指针型（isa的值部分代表class的地址）
+     函数四要素：名称、返回值、参数、函数体
+     method_t : SEL name(名称)  const char* types(返回值、参数)  IMP imp(函数体)
+     types是应用type Encodings技术的字符串，前几位代表返回值，后面代表参数，如 -(void)aMethod ->objc_msgSend(self, @selector(aMethod)) ->v@:(v - void @ - id  : - SEL)
+  2.类对象和元类对象
+    区别：类对象存储实例方法列表等信息，元类对象存储类方法列表等信息
+    共同点：类对象和类对象都是objc_class ，继承自objc_objet，有isa指针
+    isa方向 实例对象 -> 类对象 -> 元类对象 - >root class(meta)
+    问题：
+    如果类方法没有实现，但是有同名的实例方法实现，会不会发生崩溃和调用
+      如果该类不是根类（NSObject）,崩溃 ，如果该类是根类NSObject，会调用，因为元类根类的superclass的指针指向了根类，系统会到根类里查找
+  3.消息传递
+    void objc_msgSend(id self , SEL)
+    void objc_msgSendSuper(objc_super *super , SEL)
+     struct objc_super {
+         __unsafe_unretained id receiver
+     }
+    具体流程见资料runtime消息传递图
+  4.消息转发流程
