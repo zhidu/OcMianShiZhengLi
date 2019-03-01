@@ -493,4 +493,22 @@ UIView和CALayer关系：
          __unsafe_unretained id receiver
      }
     具体流程见资料runtime消息传递图
-  4.消息转发流程
+  4.消息转发流程(见图)
+  5.method-swizzling
+  6.动态添加方法
+    在resolveInstanceMethod中用class_addMethod函数添加实现
+    @dynamic 动态运行时将函数决议推迟到运行时，编译时语言j在编译期进行函数决议
+  总结：
+     [obj foo]和objc_msgSend()函数有什么关系？
+       objc_msgSend(obj,@selector(foo))
+     runtimeh如何通过Selector找到对应的IMP的地址的？
+       见消息传递过程
+     能否向编译后的类中增加实例变量？
+      不能向编译后的类中添加实例变量,因为编译后的实例变量布局已经完成，可以向动态添加的类中添加实例变量
+ 五、block
+    block介绍
+       block是将函数及其上下文封装起来的对象
+    截获变量
+    __block
+    block的内存管理
+    block的循环引用
