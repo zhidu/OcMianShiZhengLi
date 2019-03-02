@@ -42,6 +42,9 @@ OC面试整理
 二 UI视图
 1.UITableView相关
 重用机制：
+   dequeueReusableCellWithIdentifier:和dequeueReusableCellWithIdentifier:forIndexPath:的区别：
+        如果你注册过Cell，在没有可用的cell时，前者会返回nil；而后者永远都会从注册的nib或者class中替你创建一个可用的Cell。也就是说，前者调用你需要手动检查nil，而后者不需要；
+        如果你从没有注册过cell，在没有可用的cell时，前者会返回nil，后者……直接崩溃！也就是说，调用后者你 必须确保注册过cell 。
 数据源同步：多线程环境下访问数据源(解决方案):
           并发访问、数据拷贝的方式
           串行访问的方式
@@ -232,47 +235,6 @@ UIView和CALayer关系：
       用KVC实现高阶消息传递,比如当对容器类使用KVC时，valueForKey:将会被传递给容器中的每一个对象，而不是容器本身进行操作。结果会被添加进返回的容器中，这样，开发者可以很方便的操作集合来返回另一个集合
       用KVC中的函数操作集合
 8.属性关键字
-<<<<<<< HEAD
-读写权限：
-readonly readwrite(默认)
-原子类：
-atomic  赋值和获取线程安全，添加对象和移除对象等别的操作不是线程安全的
-nonatomic
-引用计数：
-retain/strong
-assign/unsafe_unretained
-        特点：
-          修饰基本数据类型
-          修饰对象类型师，不改变其引用计数
-          会产生悬垂指针
-weak
-        特点：
-         不改变被修饰对象的引用计数
-         所指对象在释放后会自动置为nil
-9.浅拷贝和深拷贝
-是否开辟新的内存空间
-是否影响了引用计数
-
-mutable对象（可变）        copy       不可变   深拷贝
-mutable对象（可变）     mutablecopy    可变    深拷贝
-immutable对象（不可变）    copy        不可变   浅拷贝
-immutable对象（不可变）  mutablecopy   可变    深拷贝
-
-总结：
-MRC如何重写retain修饰变量的setter方法
-- (void)setObj:(id)Obj {
-    if(_obj != obj)
-        [obj release];
-    _obj =  [obj retain];
-}
-请简述分类的实现原理
-KVO的实现原理
-能否为分类添加成员变量
-
-
-
-
-=======
     读写权限：
     readonly readwrite(默认)
     原子类：
@@ -337,7 +299,6 @@ KVO的实现原理
     请简述分类的实现原理
     KVO的实现原理
     能否为分类添加成员变量
->>>>>>> 7cdeaa4d3a05253a3e643c63c557574e2faa77d1
 
 四、内存管理
     内存布局
@@ -484,6 +445,7 @@ KVO的实现原理
        苹果是如何实现autoreleasePool?
            自动释放池是以栈为节点通过双向链表的形式组合而成的数据结构
  五、runtime
+   runtime能给分类新建属性、动态添加方法创建类、交换方法、获得某个类的所有成员方法、所有成员变量、实现NSCoding的自动归档和自动解档（mj一个宏解决）、实现字典和模型的自动转换
   1.数据结构
      id = objc_objet { 对象-->类对象
          isa_t
@@ -581,3 +543,125 @@ KVO的实现原理
     block的循环引用
          为什么会循环引用
            如果说当前block对某一个对象的属性有个强引用，当前对象又对block有一个强引用，加上__block也可能产生循环引用，但是是区分场景的，mrc没事，arc会循环引用
+六、多线程
+     1.死锁
+        队列引起的持续等待
+     2.栅栏函数dispatch_barrier_async
+        如何用gcd实现多读单写
+     3.NSOperation
+        优势：
+           可以添加依赖
+           任务执行状态控制：
+                  isReady isExecuting isFinished isCancelled
+           最大并发量
+         状态控制：
+         如果只是重写main方法，底层控制变更任务执行完成状态，以及任务退出
+         如果重写start方法，自行控制任务状态
+       问题 系统怎么移除一个isfinished = yes的NSOperation？ 通过kvo
+      4.NSThread
+                                     
+      5.ios中的锁
+         @synthesize :一般在创建单例对象时使用
+         @atomic:修饰属性的关键字，对被修饰的对象进行原子操作（不负责使用）
+         osspinlock：循环等待询问，不释放当前资源，用于轻量级数据访问，简单的int+1/-1
+         NSLock:
+         NSRecursiveLock(递归锁):可以重路添加
+         dispatch_semaphone_t:
+              阻塞是一个主动行为，唤醒是被动行为
+       总结：
+         ios系统为我们提供的几种多线程技术各自的特点是怎样？
+          ios系统中主要提供了三种多线程技术，分别为gcd、NSOperation、NSThread，我们一般使用gcd用来实现简单的线程同步，包括一些子线程的分派和多读单写的实现，对于NSOperation，第三方框架SD和AF都有涉及，由于它特点是我们可以对任务状态进行控制，包括可以控制它添加依赖和移除依赖，对于NSThread一般用来实现常驻线程
+         你都用过哪过锁？结合实际谈谈你是怎样使用的？
+                                     
+ 七、runloop
+     概念：
+        通过内部维护的事件循环来对事件/消息进行管理的一个对象
+           没有消息需要处理时，休眠以避免资源占用：用户态（切换）-> mach_msg()->内核态
+           有消息需要处理时，立刻被唤醒：内核态 （切换）-> 用户态
+        问题：为什么main能保持不退出
+              在main函数中，启用了一个runloop,....<概念>
+     数据结构：
+            NSRunLoop是CFRunLoop的封装，提供面向对象的API
+                CFRunLoop：
+                     pthread（一一对应线程）
+                     currentMode
+                     modes
+                     commonModes-> NSMutableSet<NSString *>
+                     commonModeItems ->集合包括observer/Timer/Source
+                CFRunLoopMode：
+                     name ->NSDefaultRunLoopMode(字符串)
+                     sources0 ->NSMutableSet
+                     sources1 ->NSMutableSet
+                     observers ->NSMutableArray
+                     timers ->NSMutableArray
+                Source/Timer/Observer
+                CFRunLoopSource：
+                     sources0 ->需要手动唤醒线程，如点击和触摸
+                     sources1 ->具备唤醒线程的能力
+                CFRunLoopObserver：
+                       观测时间点：
+                         typedef CF_OPTIONS(CFOptionFlags, CFRunLoopActivity) {
+                             kCFRunLoopEntry         = (1UL << 0), // 即将进入Loop
+                             kCFRunLoopBeforeTimers  = (1UL << 1), // 即将处理 Timer
+                             kCFRunLoopBeforeSources = (1UL << 2), // 即将处理 Source
+                             kCFRunLoopBeforeWaiting = (1UL << 5), // 即将进入休眠
+                             kCFRunLoopAfterWaiting  = (1UL << 6), // 刚从休眠中唤醒
+                             kCFRunLoopExit          = (1UL << 7), // 即将退出Loop
+                         };
+                  CommonModes：
+                     一个 Mode 可以将自己标记为”Common”属性（通过将其 ModeName 添加到 RunLoop 的 “commonModes” 中）。每当 RunLoop 的内容发生变化时，RunLoop 都会自动将 _commonModeItems 里的 Source/Observer/Timer 同步到具有 “Common” 标记的所有Mode里。
+                  commonmode的特殊性：
+                        commonmode不是一个实际存在的一种mode，是同步source/timer/observe到多个mode中的一种技术方案
+                  runloop为什么有多个model？
+                      一个 RunLoop 包含若干个 Mode，每个 Mode 又包含若干个 Source/Timer/Observer。每次调用 RunLoop 的主函数时，只能指定其中一个 Mode，这个Mode被称作 CurrentMode。如果需要切换 Mode，只能退出 Loop，再重新指定一个 Mode 进入。这样做主要是为了分隔开不同组的 Source/Timer/Observer，让其互不影响。
+                  线程被唤醒有哪些方式？souce1/timer事件/外部手动唤醒
+                                     
+     事件循环机制：
+           app从点击图标到运行到退出程序，系统做了什么？
+             程序启动会调用main函数后，会调用UIApplicationMain函数，在函数的内部会启动主线程的runloop，经过一系列的处理最终主线程的runloop会进入休眠状态，如果点击屏幕会产生mach_port，基于mach_port会转成一个source1，可以把主线程唤醒，运行，处理，后面杀死app，会发生runloop退出，发送通知退出runloop
+     runloop和NSTimer：
+         PerformSelecter
+         当调用 NSObject 的 performSelecter:afterDelay: 后，实际上其内部会创建一个 Timer 并添加到当前线程的 RunLoop 中。所以如果当前线程没有 RunLoop，则这个方法会失效。
+         当调用 performSelector:onThread: 时，实际上其会创建一个 Timer 加到对应的线程去，同样的，如果对应线程没有 RunLoop 该方法也会失效。
+     runloop和多线程：
+          一一对应，并且自己创建的线程默认没有runloop
+          设计常驻线程：
+             为当前线程开启一个runloop
+             向该runloop中添加一个port/source得维持runloop的事件循环
+             启动runloop
+           怎么保证子线程数据回来更新UI的时候不打断用户滑动？
+            把子线程提交的数据回来更新UI的逻辑包装起来提交到主线程的default模式下，这样滑动完，从tracking模式切换到default模式
+ 八、网络
+           1.HTTP
+                 HTTP是超文本传输协议
+                  请求/响应报文：
+                         请求方式有哪些：GET POST HEAD PUT DELETE OPTIONS
+                         get和post区别：
+                            初级答案：
+                                 get请求参数以？分割拼接到url后面，post请求参数在body里面
+                                 get请求参数长度限制2048个字符，post-般没有该限制
+                                 get请求不安全，post请求安全
+                             中高级答案（从语义角度，即协议定义规范）：
+                                 get请求是获取资源，是安全的、幂等的、可缓存的
+                                 post请求是处理资源，不安全的、非幂等的、不可缓存的
+                                 安全是指不应该引起服务端热任何状态变化（get head options）
+                                 幂等是指同一个请求方法执行多次和执行一次的效果完全相同（put delete）
+                  连接建立流程：
+                       三次握手四次挥手
+                  HTTP的特点：
+                       无连接
+                       无状态
+                  charles抓包原理：
+                              中间人攻击
+           2.https与网络安全
+                  https = http(应用层) + ssl/tls（应用层之下、传输层之上（tcp））
+                  https与http的区别？
+                      https是安全的http，他的安全是由ssl/tls插在应用层之下、传输层之上来保证的
+                  https都使用了哪些加密手段？
+                      连接建立过程中使用非对称加密，非对称加密很耗时
+                      后续通信过程中使用了对称加密
+                   非对称加密/对称加密：（见图）
+           3.tcp（传输控制协议，传输层）：
+             udp（用户数据报协议，传输层）：
+                    特点：无连接、尽最大努力交互、面向报文（既不合并也不拆分）
+                    功能：多端口复用、分用、差错检测
