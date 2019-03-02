@@ -130,6 +130,45 @@ UIView和CALayer关系：
 6.kvo
 7.kvc
 8.属性关键字
+读写权限：
+readonly readwrite(默认)
+原子类：
+atomic  赋值和获取线程安全，添加对象和移除对象等别的操作不是线程安全的
+nonatomic
+引用计数：
+retain/strong
+assign/unsafe_unretained
+        特点：
+          修饰基本数据类型
+          修饰对象类型师，不改变其引用计数
+          会产生悬垂指针
+weak
+        特点：
+         不改变被修饰对象的引用计数
+         所指对象在释放后会自动置为nil
+9.浅拷贝和深拷贝
+是否开辟新的内存空间
+是否影响了引用计数
+
+mutable对象（可变）        copy       不可变   深拷贝
+mutable对象（可变）     mutablecopy    可变    深拷贝
+immutable对象（不可变）    copy        不可变   浅拷贝
+immutable对象（不可变）  mutablecopy   可变    深拷贝
+
+总结：
+MRC如何重写retain修饰变量的setter方法
+- (void)setObj:(id)Obj {
+    if(_obj != obj)
+        [obj release];
+    _obj =  [obj retain];
+}
+请简述分类的实现原理
+KVO的实现原理
+能否为分类添加成员变量
+
+
+
+
 
 
 
