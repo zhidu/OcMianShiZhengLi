@@ -719,7 +719,90 @@ UIView和CALayer关系：
                线程的处理
                                      
          2.阅读时长
+               怎样设计一个时长统计框架？
+                  记录器 -> 记录管理者
+                  记录器：页面式、流式、自定义式（轮播图）
+                  记录管理者：记录缓存：磁盘存储 - 防止存储在内存中因为app杀死、断电丢失情况
+                            上传器
+               为何要有不同类型的记录器？
+                 基于不同分类的场景提供的关于记录的封装、适配
+               记录数据由于某种原因丢失，你是怎么处理的？
+                 定时写磁盘
+                 限定内存缓存条数（10条），超过该条数，即写磁盘
+                上传时机？
+                      延时上传：前后台切换、无网到有网的变化
+                      立刻上传
+                      定时上传
          3.复杂页面
+               整体架构
+               数据流
+               反向更新
+                思想：mvvm框架思想 、 reactNative的数据流思想 、 系统UIView更新机制的思想、facebook开源框架ASyncDisplayKit关于预排版的设计思想
          4.客户端整体架构
+                 业务解耦通信方式：
+                     openurl
+                     依赖注入
                                      
-                                     
+十、设计模式
+     六大设计原则：
+          单一职责原则：一个类只负责一件事，CALayer和UIView
+             开闭原则：对修改关闭、对扩展开放
+          接口隔离原则：使用多个专门的协议、而不是一个庞大臃肿的协议 （tabliew的代理）
+          依赖倒置原则：抽象不应该依赖于具体实现，具体实现可以依赖于抽象（如增删改查提供的接口（.h里的方法）不依赖于.m里的实现，增删改查可以有多种实现）
+          里氏替换原则：父类可以被子类无缝替换，且原有功能不受任何影响（kvo）
+            迪米特法则：一个对象应当对其他对象有尽可能少的了解,这样可以高内聚、低耦合
+        设计模式：
+         责任链：一个类有他自己这个类的成员变量，就是责任链的主体
+          桥接:在软件系统中，某些类型由于自身的逻辑，它具有两个或多个维度的变化，那么如何应对这种“多维度的变化”？如何利用面向对象的技术来使得该类型能够轻松的沿着多个方向进行变化，而又不引入额外的复杂度？这就要使用Bridge模式。
+              定义一个抽象的父类A和抽象的父类B，把抽象父类b作为抽象父类a的成员值，这样就可以衍生出A1到B1、B2、B3，A2到B1、B2、B3的联系，两个父类其中持有一个就起到了桥梁的作用
+         适配器
+             对象适配器
+             类适配器
+         单例：
+             // 命令管理者以单例方式呈现
+             + (instancetype)sharedInstance
+            {
+                static CommandManager *instance = nil;
+                static dispatch_once_t onceToken;
+                dispatch_once(&onceToken, ^{
+                    instance = [[super allocWithZone:NULL] init];
+                });
+                return instance;
+            }
+             
+             // 【必不可少】
+             + (id)allocWithZone:(struct _NSZone *)zone{
+                 return [self sharedInstance];
+             }
+             
+             // 【必不可少】
+             - (id)copyWithZone:(nullable NSZone *)zone{
+                 return self;
+             }
+
+          命令模式：行为参数化，降低代码重合度
+  十、算法
+          字符串反转：
+              @"abc" -> @"cba"
+          链表算法
+          有序数组合并
+          hash算法
+          求无序数组中的中位数
+ 十一框架
+     
+     AFNetworking:
+         主要关系见图
+         AFURLSessionManager:
+            创建和管理NSURLSession、NSURLSessionTask
+            实现NSURLSessionDelegate等协议的代理方法
+            引入AFSecurityPolicy保证请求安全
+            引入AFNetworkingReachabilityManager监控网络状态
+     SDWebImage:
+     ReactiveCocoa:
+            信号是代表一连串的状态，在状态改变时，对应的订阅者RACSubscriber就会收到通知执行相应的指令
+     AsyncDisplayKit：
+             把大部分的事情都放到子线程中去做，如文本计算、视图布局计算、文本渲染、图片解码、图形绘制、对象创建销毁和调整
+             原理：
+                    针对ASNode的修改和提交，会对其进行封装并提交到一个全局容器中
+                    ASDK在runloop注册一个观察者
+                    在runloop进入休眠前，ASDk执行该runloop的提交的所有任务
